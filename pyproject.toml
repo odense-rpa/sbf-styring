@@ -6,10 +6,13 @@ readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
     "automation-server-client",
+    "datafordeler",
     "dubu-client",
     "kmd-nexus-client",
+    "momentum-client",
     "nexus-database-client",
     "odk-tools",
+    "sbf-database",
 ]
 
 [tool.uv.sources]
@@ -17,4 +20,7 @@ odk-tools = { git = "https://github.com/odense-rpa/odk-tools.git", rev = "master
 kmd-nexus-client = { git = "https://github.com/odense-rpa/nexus-client.git", rev = "main" }
 nexus-database-client = { git = "https://github.com/odense-rpa/nexus-database-client.git", rev = "main" }
 automation-server-client = { git = "https://github.com/odense-rpa/automation-server-client.git", tag = "v0.2.1" }
-dubu-client = { git = "https://github.com/odense-rpa/dubu-client.git" }
+dubu-client = { git = "https://github.com/odense-rpa/dubu-client.git", rev = "main"}
+datafordeler = { git = "https://github.com/odense-rpa/datafordeler.git", rev = "main" }
+sbf-database = { git = "https://github.com/odense-rpa/sbf-database.git", rev = "main" }
+momentum-client = { git = "https://github.com/odense-rpa/momentum-client.git", rev = "main" }
