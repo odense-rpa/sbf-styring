@@ -3,6 +3,7 @@ import sys
 import asyncio
 import logging
 import os
+from httpx import HTTPStatusError
 
 from automation_server_client import AutomationServer, Workqueue, Credential, WorkItemStatus, WorkItemError
 from kmd_nexus_client import NexusClientManager
@@ -26,7 +27,6 @@ reporter: Reporter
 sbf_database: SBFManager
 tracker: Tracker
 
-
 proces_navn = "SBF Styring"
 
 nexus_forløb = [
@@ -46,9 +46,11 @@ nexus_forløb = [
 ]
 
 # TODO: Duplicate børn cpr mellem begge systemer, what do?
+# TODO: Timeout på DUBU
+# TODO: Timout på DB
 
 async def populate_queue(workqueue: Workqueue):
-    dubu_borgere = hent_dubu_borgere()
+    #dubu_borgere = hent_dubu_borgere()
     nexus_borgere = hent_nexus_borgere()
     #sbf_kandidater = filtrer_sbf_kandidater(dubu_borgere, nexus_borgere)
 
@@ -145,7 +147,7 @@ def hent_nexus_borgere() -> list[BarnSynkronisering]:
                     if sagsbehandler is None:
                         break
 
-                    barn = BarnSynkronisering(
+                    barn_model = BarnSynkronisering(
                         barn_cpr=barn["cpr"],
                         barn_foraelder_cpr="",
                         barn_sidst_set=datetime.now(),
@@ -160,44 +162,42 @@ def hent_nexus_borgere() -> list[BarnSynkronisering]:
                         # dubu_slettet=False,
                         # status=SynkroniseringsStatus.SYNC                                                            
                     )
-                    nexus_borgere.append(barn)
+                    # Test
+                    
+                    
+                    nexus_borgere.append(barn_model)
 
     return sorted(nexus_borgere)
 
 
-
 def filtrer_sbf_kandidater(dubu_borgere: list[BarnSynkronisering], nexus_borgere: list[BarnSynkronisering]) -> list[dict]:
-    sbf_kandidater = []
+    sbf_kandidater = []    
 
-    # for cpr in dubu_borgere:
-    #     er_der_sbf = kontroller_forældre(cpr)
+    for dubu_barn in dubu_borgere:
+        forældre_myndigheder = hent_forældre_myndigheder(str(dubu_barn.barn_cpr))
+        for forældre_myndighed in forældre_myndigheder:
+            if kontroller_forælder_i_momentum(forældre_myndighed):                
+                # Hent oplysninger i Momentum
+                # Set status sync + details                
+                pass
 
-    #     if er_der_sbf:
-    #         sbf_kandidater.append({
-    #             "cpr": cpr,
-    #             "kilde": "DUBU"
-    #             # TODO: Tilføj forældreinfo
-    #             # TODO: Tilføj sagsbehandlerinfo Momentum
-    #         })
-
-    # for cpr in nexus_borgere:
-    #     er_der_sbf = kontroller_forældre(cpr)
-
-    #     if er_der_sbf:
-    #         sbf_kandidater.append({
-    #             "cpr": cpr,
-    #             "kilde": "NEXUS"
-    #             # TODO: Tilføj forældreinfo
-    #             # TODO: Tilføj sagsbehandlerinfo Momentum
-    #         })
-
+    
     return sbf_kandidater
 
-def kontroller_forældre(cpr: str) -> bool:
-    # Implement the logic to check if the parent is valid
-    # Kald Datafordeler for forældremyndigheder
-    # For hver forælder, hvis i live, kald Momentum
+def hent_forældre_myndigheder(cpr: str) -> list[dict]:    
+    person_data = datafordeler.hent_personoplysninger(cpr)
+    return person_data.get("Person", {}).get("Foraelderoplysninger", [])
 
+def kontroller_forælder_i_momentum(forælder_myndighed: dict) -> bool:
+    try:
+        forælder = momentum.borgere.hent_borger(forælder_myndighed.get("Foraelderoplysning", {}).get("Foraelder", {}).get("foraelderPersonnummer", ""))
+    except HTTPStatusError:
+        return False
+    
+    if not forælder or forælder.get("cprStatusCode", "") == "DØD":
+        return False
+    if forælder.get("targetGroupCode") is None:
+        return False
     return True
 
 async def process_workqueue(workqueue: Workqueue):
