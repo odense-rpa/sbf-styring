@@ -50,7 +50,7 @@ nexus_forløb = [
 async def populate_queue(workqueue: Workqueue):
     dubu_borgere = hent_dubu_borgere()
     nexus_borgere = hent_nexus_borgere()
-    sbf_kandidater = filtrer_sbf_kandidater(dubu_borgere, nexus_borgere)
+    #sbf_kandidater = filtrer_sbf_kandidater(dubu_borgere, nexus_borgere)
 
 def hent_dubu_borgere() -> list[BarnSynkronisering]:
     dubu_borgere: list[BarnSynkronisering] = []
@@ -60,12 +60,10 @@ def hent_dubu_borgere() -> list[BarnSynkronisering]:
         if person.get("primaerPerson") is not None and person.get("primaerPerson", {}).get("cprnr") is not None:
             sagsbehandler = dubu.brugere.hent_org_bruger(person.get("primaerBehandler", {}).get("orgBrugerId", -1))
 
-            if sagsbehandler is None:
-                # TODO: Hvis ingen sagsbehandler, what then?
-                continue
-            
+            if sagsbehandler is None:                
+                continue            
 
-            borger = BarnSynkronisering(
+            barn = BarnSynkronisering(
                 barn_cpr=person["primaerPerson"]["cprnr"],
                 barn_foraelder_cpr="",
                 barn_sidst_set=datetime.now(),
@@ -81,7 +79,7 @@ def hent_dubu_borgere() -> list[BarnSynkronisering]:
                 # status=SynkroniseringsStatus.SYNC
                                                       
             )
-            dubu_borgere.append(borger)
+            dubu_borgere.append(barn)
     
     return sorted(dubu_borgere, key=lambda x: x.barn_cpr)
 
@@ -89,9 +87,9 @@ def hent_nexus_borgere() -> list[BarnSynkronisering]:
     nexus_borgere = []
     nexus_borgere_ufiltreret = nexus_database_client.hent_borgere_til_sammenhængende_borgerforløb()    
 
-    for borger in nexus_borgere_ufiltreret:
+    for barn in nexus_borgere_ufiltreret:
         try:
-            nexus_borger = nexus.borgere.hent_borger(borger["cpr"])
+            nexus_borger = nexus.borgere.hent_borger(barn["cpr"])
         except ValueError:
             # Suppress invalid cpr-numbers
             continue
@@ -121,7 +119,48 @@ def hent_nexus_borgere() -> list[BarnSynkronisering]:
                 )
 
                 if len(aktive_indsatser) > 0:
-                    nexus_borgere.append(borger["cpr"])
+                    # Check forløb med aktiv indsats for sagsbehandler
+                    sagsbehandler = filter_by_path(
+                        indsats_referencer,
+                        path_pattern=f"/Børn og Unge Grundforløb/{forløb}/professionalReference",
+                        active_pathways_only=True,
+                    )                    
+
+                    if len(sagsbehandler) == 0:
+                        # Check grundforløb for sagsbehandler
+                        sagsbehandler = filter_by_path(
+                            indsats_referencer,
+                            path_pattern="/Børn og Unge Grundforløb/professionalReference",
+                            active_pathways_only=True,
+                        )
+                        
+                        if len(sagsbehandler) == 0:
+                            break
+
+                    # Resolve sagsbehandler, objekt i pathway har ingen kontakt information, dvs. vi resolver hele medarbejderen.
+                    sagsbehandler = nexus.hent_fra_reference(sagsbehandler[0])
+                    sagsbehandler = nexus_database_client.hent_medarbejder_med_activity_id(sagsbehandler.get("activityIdentifier", {}).get("activityId", ""))
+                    sagsbehandler = nexus.organisationer.hent_medarbejder_ved_initialer(sagsbehandler[0].get("primary_identifier", ""))
+
+                    if sagsbehandler is None:
+                        break
+
+                    barn = BarnSynkronisering(
+                        barn_cpr=barn["cpr"],
+                        barn_foraelder_cpr="",
+                        barn_sidst_set=datetime.now(),
+                        barn_sagsbehandler_initialer=f"{sagsbehandler['initials']}",
+                        barn_sagsbehandler_information= f"{sagsbehandler.get('fullName', '')}, {sagsbehandler['initials']}@odense.dk, {sagsbehandler.get('mobile', '')}",
+                        #nexus_sidst_synkroniseret=datetime.now()
+                        #nexus_slettet=False,
+                        # momentum_sidst_synkroniseret=datetime(1, 1, 1, 0, 0, 0),
+                        # momentum_slettet=False,
+                        # momentum_nuvaerende_kontaktpersoner=None,
+                        dubu_sidst_synkroniseret=datetime.now(),
+                        # dubu_slettet=False,
+                        # status=SynkroniseringsStatus.SYNC                                                            
+                    )
+                    nexus_borgere.append(barn)
 
     return sorted(nexus_borgere)
 
@@ -232,9 +271,9 @@ if __name__ == "__main__":
         password=user_credential.password
     )
 
-    sbf_manager = SBFManager(
-        database_url=os.getenv("DB_CONNECTION", "")
-    )
+    #sbf_manager = SBFManager(
+    #    database_url=os.getenv("DB_CONNECTION", "")
+    #)
     
     tracker = Tracker(
         username=tracking_credential.username, 
