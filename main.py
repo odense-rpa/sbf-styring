@@ -1,4 +1,6 @@
+import copy
 from datetime import datetime
+import json
 import sys
 import asyncio
 import logging
@@ -7,6 +9,7 @@ from httpx import HTTPStatusError
 
 from automation_server_client import AutomationServer, Workqueue, Credential, WorkItemStatus, WorkItemError
 from kmd_nexus_client import NexusClientManager
+from kmd_nexus_client import utils
 from nexus_database_client import NexusDatabaseClient
 from kmd_nexus_client.tree_helpers import (
     filter_by_path 
@@ -47,12 +50,14 @@ nexus_forløb = [
 
 # TODO: Duplicate børn cpr mellem begge systemer, what do?
 # TODO: Timeout på DUBU
-# TODO: Timout på DB
+# TODO: Sletning af SBF kandidater der ikke længere er aktive i et af de tre systemer.
 
 async def populate_queue(workqueue: Workqueue):
-    #dubu_borgere = hent_dubu_borgere()
+    dubu_borgere = hent_dubu_borgere()
     nexus_borgere = hent_nexus_borgere()
-    #sbf_kandidater = filtrer_sbf_kandidater(dubu_borgere, nexus_borgere)
+    borgere = sorted(dubu_borgere + nexus_borgere, key=lambda x: x.barn_cpr)
+    sbf_kandidater = filtrer_sbf_kandidater(borgere)
+    synkroniser_borgere_i_database(sbf_kandidater)
 
 def hent_dubu_borgere() -> list[BarnSynkronisering]:
     dubu_borgere: list[BarnSynkronisering] = []
@@ -63,33 +68,38 @@ def hent_dubu_borgere() -> list[BarnSynkronisering]:
             sagsbehandler = dubu.brugere.hent_org_bruger(person.get("primaerBehandler", {}).get("orgBrugerId", -1))
 
             if sagsbehandler is None:                
-                continue            
+                continue
+
+            if not utils.is_valid_cpr(person.get("primaerPerson", {}).get("cprnr")):
+                continue
+
+            sagsbehandler_information = {
+                "navn": sagsbehandler.get("fuldeNavn", ""),
+                "email": sagsbehandler.get("adresse", {}).get("emailAdresse", ""),
+                "telefon": sagsbehandler.get("adresse", {}).get("mobiltelefon", "")
+            }
 
             barn = BarnSynkronisering(
                 barn_cpr=person["primaerPerson"]["cprnr"],
                 barn_foraelder_cpr="",
                 barn_sidst_set=datetime.now(),
                 barn_sagsbehandler_initialer=sagsbehandler.get("adresse", {}).get("emailAdresse", "").split("@")[0],
-                barn_sagsbehandler_information= f"{sagsbehandler.get('fuldeNavn', '')}, {sagsbehandler.get('adresse', {}).get('emailAdresse', '')}, {sagsbehandler.get('adresse', {}).get('mobiltelefon', '')}",
-                nexus_sidst_synkroniseret=datetime.now()
-                # nexus_slettet=False,
-                # momentum_sidst_synkroniseret=datetime(1, 1, 1, 0, 0, 0),
-                # momentum_slettet=False,
-                # momentum_nuvaerende_kontaktpersoner=None,
-                # dubu_sidst_synkroniseret=datetime(1, 1, 1, 0, 0, 0),
-                # dubu_slettet=False,
-                # status=SynkroniseringsStatus.SYNC
-                                                      
+                barn_sagsbehandler_information= json.dumps(sagsbehandler_information),
+                nexus_sidst_synkroniseret=datetime.now()                                                   
             )
+
             dubu_borgere.append(barn)
     
-    return sorted(dubu_borgere, key=lambda x: x.barn_cpr)
+    return dubu_borgere
 
 def hent_nexus_borgere() -> list[BarnSynkronisering]:
     nexus_borgere = []
     nexus_borgere_ufiltreret = nexus_database_client.hent_borgere_til_sammenhængende_borgerforløb()    
 
     for barn in nexus_borgere_ufiltreret:
+        if not utils.is_valid_cpr(barn.get("cpr", "")):
+            continue
+
         try:
             nexus_borger = nexus.borgere.hent_borger(barn["cpr"])
         except ValueError:
@@ -147,42 +157,58 @@ def hent_nexus_borgere() -> list[BarnSynkronisering]:
                     if sagsbehandler is None:
                         break
 
+                    sagsbehandler_information = {
+                        "navn": sagsbehandler.get("fullName", ""),
+                        "email": f"{sagsbehandler['initials']}@odense.dk",
+                        "telefon": f"{sagsbehandler.get('mobile', '')}"
+                    }
+
                     barn_model = BarnSynkronisering(
                         barn_cpr=barn["cpr"],
                         barn_foraelder_cpr="",
                         barn_sidst_set=datetime.now(),
                         barn_sagsbehandler_initialer=f"{sagsbehandler['initials']}",
-                        barn_sagsbehandler_information= f"{sagsbehandler.get('fullName', '')}, {sagsbehandler['initials']}@odense.dk, {sagsbehandler.get('mobile', '')}",
-                        #nexus_sidst_synkroniseret=datetime.now()
-                        #nexus_slettet=False,
-                        # momentum_sidst_synkroniseret=datetime(1, 1, 1, 0, 0, 0),
-                        # momentum_slettet=False,
-                        # momentum_nuvaerende_kontaktpersoner=None,
-                        dubu_sidst_synkroniseret=datetime.now(),
-                        # dubu_slettet=False,
-                        # status=SynkroniseringsStatus.SYNC                                                            
+                        barn_sagsbehandler_information= json.dumps(sagsbehandler_information),
+                        dubu_sidst_synkroniseret=datetime.now(),                                                     
                     )
-                    # Test
-                    
                     
                     nexus_borgere.append(barn_model)
 
-    return sorted(nexus_borgere)
+    return nexus_borgere
 
 
-def filtrer_sbf_kandidater(dubu_borgere: list[BarnSynkronisering], nexus_borgere: list[BarnSynkronisering]) -> list[dict]:
+def filtrer_sbf_kandidater(borgere: list[BarnSynkronisering]) -> list[BarnSynkronisering]:
     sbf_kandidater = []    
 
-    for dubu_barn in dubu_borgere:
-        forældre_myndigheder = hent_forældre_myndigheder(str(dubu_barn.barn_cpr))
+    for barn in borgere:
+        forældre_myndigheder = hent_forældre_myndigheder(str(barn.barn_cpr))
         for forældre_myndighed in forældre_myndigheder:
-            if kontroller_forælder_i_momentum(forældre_myndighed):                
-                # Hent oplysninger i Momentum
-                # Set status sync + details                
-                pass
+            if kontroller_forælder_i_momentum(forældre_myndighed):
+                forældre_cpr = forældre_myndighed.get("Foraelderoplysning", {}).get("Foraelder", {}).get("foraelderPersonnummer", "")
+                if not utils.is_valid_cpr(forældre_cpr):
+                    continue
+                # TODO: Hent sagsbehandler information fra momentum og set data
 
+                barn = copy.deepcopy(barn)
+                barn.barn_foraelder_cpr = forældre_cpr
+                sbf_kandidater.append(barn)
     
     return sbf_kandidater
+
+def synkroniser_borgere_i_database(sbf_kandidater: list[BarnSynkronisering]):
+    for barn in sbf_kandidater:
+        eksisterende_barn = sbf_database.hent_efter_cpr(barn_cpr=str(barn.barn_cpr), barn_foraelder_cpr=str(barn.barn_foraelder_cpr))
+        if eksisterende_barn is None:
+            sbf_database.opret(
+                barn_cpr=str(barn.barn_cpr),
+                barn_foraelder_cpr=str(barn.barn_foraelder_cpr),
+                barn_sidst_set=barn.barn_sidst_set,
+                barn_sagsbehandler_initialer=str(barn.barn_sagsbehandler_initialer),
+                barn_sagsbehandler_information=str(barn.barn_sagsbehandler_information)
+            )
+            sbf_database.opdater(barn)
+        else:
+            sbf_database.opdater(barn)
 
 def hent_forældre_myndigheder(cpr: str) -> list[dict]:    
     person_data = datafordeler.hent_personoplysninger(cpr)
@@ -271,9 +297,9 @@ if __name__ == "__main__":
         password=user_credential.password
     )
 
-    #sbf_manager = SBFManager(
-    #    database_url=os.getenv("DB_CONNECTION", "")
-    #)
+    sbf_database = SBFManager(
+        database_url=os.getenv("DB_CONNECTION", "")
+    )
     
     tracker = Tracker(
         username=tracking_credential.username, 
