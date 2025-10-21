@@ -106,6 +106,7 @@ class Nexus(NexusClientManager):
 
                         sagsbehandler_information = { 
                             "nexus": {
+                                "initialer": sagsbehandler['initials'],
                                 "navn": sagsbehandler.get("fullName", ""),
                                 "email": f"{sagsbehandler['initials']}@odense.dk",
                                 "telefon": f"{sagsbehandler.get('mobile', '')}"
@@ -117,17 +118,13 @@ class Nexus(NexusClientManager):
                         barn_model = BarnSynkronisering(
                             barn_cpr=barn["cpr"],
                             barn_foraelder_cpr="",
-                            barn_sidst_set=datetime.now(),
-                            barn_sagsbehandler_initialer=f"{sagsbehandler['initials']}",
-                            barn_sagsbehandler_information = sagsbehandler_information,
-                            dubu_sidst_synkroniseret=datetime.now(),                                                     
+                            barn_sidst_set=datetime.now(),                            
+                            barn_sagsbehandler_information = sagsbehandler_information,                            
                         )
                         
                         nexus_borgere.append(barn_model)
 
         return nexus_borgere
-
-
 
 
 nexus: Optional[Nexus] = None

@@ -33,6 +33,9 @@ class Dubu(DubuClientManager):
 
                 sagsbehandler_information = {
                     "dubu": {
+                        "initialer": sagsbehandler.get("adresse", {})
+                        .get("emailAdresse", "")
+                        .split("@")[0],
                         "navn": sagsbehandler.get("fuldeNavn", ""),
                         "email": sagsbehandler.get("adresse", {}).get(
                             "emailAdresse", ""
@@ -48,11 +51,7 @@ class Dubu(DubuClientManager):
                     barn_cpr=person["primaerPerson"]["cprnr"],
                     barn_foraelder_cpr="",
                     barn_sidst_set=datetime.now(),
-                    barn_sagsbehandler_initialer=sagsbehandler.get("adresse", {})
-                    .get("emailAdresse", "")
-                    .split("@")[0],
-                    barn_sagsbehandler_information=sagsbehandler_information,
-                    nexus_sidst_synkroniseret=datetime.now(),
+                    barn_sagsbehandler_information=sagsbehandler_information,                    
                 )
 
                 dubu_borgere.append(barn)

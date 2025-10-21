@@ -1,21 +1,18 @@
 import copy
-from datetime import datetime
-import json
 import sys
 import asyncio
 import logging
 import os
-from httpx import HTTPStatusError
 
+from datetime import datetime
+from httpx import HTTPStatusError, ReadTimeout
 from automation_server_client import AutomationServer, Workqueue, Credential, WorkItemStatus, WorkItemError
 from kmd_nexus_client import utils
-
 from momentum_client.manager import MomentumClientManager
 from odk_tools.tracking import Tracker
 from odk_tools.reporting import Reporter
 from datafordeler import Datafordeler
 from sbf_database import SBFManager, BarnSynkronisering
-
 from systemer import init_dubu, get_dubu, init_nexus, get_nexus
 
 datafordeler: Datafordeler
@@ -26,9 +23,7 @@ tracker: Tracker
 
 proces_navn = "SBF Styring"
 
-
-# TODO: Duplicate børn cpr mellem begge systemer, what do?
-# TODO: Timeout på DUBU
+# TODO: Oprydning af kode i main.py
 # TODO: Sletning af SBF kandidater der ikke længere er aktive i et af de tre systemer.
 
 async def populate_queue(workqueue: Workqueue):
@@ -41,8 +36,8 @@ async def populate_queue(workqueue: Workqueue):
     borgere = sorted(dubu_borgere + nexus_borgere, key=lambda x: x.barn_cpr)
     sbf_kandidater = filtrer_sbf_kandidater(borgere)
     synkroniser_borgere_i_database(sbf_kandidater)
-
-
+    # TODO: Populate queues
+    # TODO: Kontroller for rows til sletning
 
 
 def filtrer_sbf_kandidater(borgere: list[BarnSynkronisering]) -> list[BarnSynkronisering]:
@@ -57,8 +52,39 @@ def filtrer_sbf_kandidater(borgere: list[BarnSynkronisering]) -> list[BarnSynkro
                     continue
                 # TODO: Hent sagsbehandler information fra momentum og set data
 
+                borger = momentum.borgere.hent_borger(forældre_myndighed.get("Foraelderoplysning", {}).get("Foraelder", {}).get("foraelderPersonnummer", ""))
+
+                if borger is None:
+                    continue
+
+                ansvarlig_sagsbehandlere_reference = momentum.borgere.hent_ansvarlige_sagsbehandlere(
+                    borger
+                )
+
+                ansvarlig_sagsbehandler = ansvarlig_sagsbehandlere_reference[0] if len(ansvarlig_sagsbehandlere_reference) > 0 else None
+                
+                if ansvarlig_sagsbehandler is None:
+                    continue
+
+                ansvarlig_sagsbehandler = momentum.borgere.hent_aktør(ansvarlig_sagsbehandler.get("caseworkerId", ""))
+
+                if ansvarlig_sagsbehandler is None:
+                    continue
+
+                sagsbehandler_information = {
+                    "momentum": {
+                        "initialer": ansvarlig_sagsbehandler.get("email", "")
+                        .split("@")[0],
+                        "navn": ansvarlig_sagsbehandler.get("displayName", ""),
+                        "email": ansvarlig_sagsbehandler.get("email", ""),
+                        "telefon": ansvarlig_sagsbehandler.get("phone", {}) #Overvej om phone/mobile er inkonsistent
+                    }                    
+                }
+
                 barn = copy.deepcopy(barn)
                 barn.barn_foraelder_cpr = forældre_cpr
+                barn.foraelder_sidst_set = datetime.now()
+                barn.foraelder_sagsbehandler_information = sagsbehandler_information
                 sbf_kandidater.append(barn)
     
     return sbf_kandidater
@@ -67,19 +93,22 @@ def synkroniser_borgere_i_database(sbf_kandidater: list[BarnSynkronisering]):
     for barn in sbf_kandidater:
         eksisterende_barn = sbf_database.hent_efter_cpr(barn_cpr=str(barn.barn_cpr), barn_foraelder_cpr=str(barn.barn_foraelder_cpr))
         if eksisterende_barn is None:
-            sbf_database.opret(
-                barn_cpr=str(barn.barn_cpr),
-                barn_foraelder_cpr=str(barn.barn_foraelder_cpr),
-                barn_sidst_set=barn.barn_sidst_set,
-                barn_sagsbehandler_initialer=str(barn.barn_sagsbehandler_initialer),
-                barn_sagsbehandler_information=barn.barn_sagsbehandler_information
-            )
-            sbf_database.opdater(barn)
-        else:
-            sbf_database.opdater(barn)
+            eksisterende_barn = sbf_database.gem(barn)            
+        
+        eksisterende_barn.barn_cpr = barn.barn_cpr
+        eksisterende_barn.barn_foraelder_cpr = barn.barn_foraelder_cpr
+        eksisterende_barn.barn_sidst_set = barn.barn_sidst_set        
+        eksisterende_barn.barn_sagsbehandler_information = barn.barn_sagsbehandler_information        
+
+        sbf_database.gem(eksisterende_barn)
 
 def hent_forældre_myndigheder(cpr: str) -> list[dict]:    
-    person_data = datafordeler.hent_personoplysninger(cpr)
+    try:
+        person_data = datafordeler.hent_personoplysninger(cpr)
+    except Exception as e:        
+        if isinstance(e, ReadTimeout):
+            return []
+        raise
     return person_data.get("Person", {}).get("Foraelderoplysninger", [])
 
 def kontroller_forælder_i_momentum(forælder_myndighed: dict) -> bool:
