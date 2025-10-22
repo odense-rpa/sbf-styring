@@ -31,6 +31,8 @@ async def synkroniser_sbf():
     # TODO: Kontroller for rows til sletning
     #sbf_db.kontroller_sbf_til_inaktivering()
 
+    # TODO: Sæt status på rows der er slettet i alle tre systemer, til Status.SLETTET
+
     # TODO: Sletning af rows som har overskredet udløbsdato + status.Slettet
 
     # TODO: Populate queues
