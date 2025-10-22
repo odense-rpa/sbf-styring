@@ -1,14 +1,10 @@
 from typing import Optional
 from datetime import datetime
-
 from kmd_nexus_client import NexusClientManager,utils
 from kmd_nexus_client.tree_helpers import filter_by_path
-
 from nexus_database_client import NexusDatabaseClient
 from automation_server_client import Credential
-
 from sbf_database import BarnSynkronisering
-
 
 nexus_forløb = [
     "Sag: Anbringelse",
@@ -44,85 +40,88 @@ class Nexus(NexusClientManager):
         nexus_borgere_ufiltreret = self.database.hent_borgere_til_sammenhængende_borgerforløb()
 
         for barn in nexus_borgere_ufiltreret:
-            if not utils.is_valid_cpr(barn.get("cpr", "")):
-                continue
-
             try:
-                nexus_borger = self.borgere.hent_borger(barn["cpr"])
-            except ValueError:
-                # Suppress invalid cpr-numbers
-                continue
+                if not utils.is_valid_cpr(barn.get("cpr", "")):
+                    continue
 
-            if not nexus_borger:
-                continue
+                try:
+                    nexus_borger = self.borgere.hent_borger(barn["cpr"])
+                except ValueError:
+                    # Suppress invalid cpr-numbers
+                    continue
 
-            pathway = self.borgere.hent_visning(borger=nexus_borger)
+                if not nexus_borger:
+                    continue
 
-            if pathway is None:
-                continue
+                pathway = self.borgere.hent_visning(borger=nexus_borger)
 
-            indsats_referencer = self.borgere.hent_referencer(visning=pathway)
+                if pathway is None:
+                    continue
 
-            for forløb in nexus_forløb:
-                filtrerede_indsats_referencer = filter_by_path(
-                    indsats_referencer,
-                    path_pattern=f"/Børn og Unge Grundforløb/{forløb}/Indsatser/basketGrantReference",
-                    active_pathways_only=True,
-                )
+                indsats_referencer = self.borgere.hent_referencer(visning=pathway)
 
-                if len(filtrerede_indsats_referencer) > 0:
-                    aktive_indsatser = self.indsatser.filtrer_indsats_referencer(
-                        indsats_referencer=filtrerede_indsats_referencer,
-                        kun_aktive=True,
-                        inkluder_indsatspakker=False
+                for forløb in nexus_forløb:
+                    filtrerede_indsats_referencer = filter_by_path(
+                        indsats_referencer,
+                        path_pattern=f"/Børn og Unge Grundforløb/{forløb}/Indsatser/basketGrantReference",
+                        active_pathways_only=True,
                     )
 
-                    if len(aktive_indsatser) > 0:
-                        # Check forløb med aktiv indsats for sagsbehandler
-                        sagsbehandler = filter_by_path(
-                            indsats_referencer,
-                            path_pattern=f"/Børn og Unge Grundforløb/{forløb}/professionalReference",
-                            active_pathways_only=True,
-                        )                    
+                    if len(filtrerede_indsats_referencer) > 0:
+                        aktive_indsatser = self.indsatser.filtrer_indsats_referencer(
+                            indsats_referencer=filtrerede_indsats_referencer,
+                            kun_aktive=True,
+                            inkluder_indsatspakker=False
+                        )
 
-                        if len(sagsbehandler) == 0:
-                            # Check grundforløb for sagsbehandler
+                        if len(aktive_indsatser) > 0:
+                            # Check forløb med aktiv indsats for sagsbehandler
                             sagsbehandler = filter_by_path(
                                 indsats_referencer,
-                                path_pattern="/Børn og Unge Grundforløb/professionalReference",
+                                path_pattern=f"/Børn og Unge Grundforløb/{forløb}/professionalReference",
                                 active_pathways_only=True,
-                            )
-                            
+                            )                    
+
                             if len(sagsbehandler) == 0:
+                                # Check grundforløb for sagsbehandler
+                                sagsbehandler = filter_by_path(
+                                    indsats_referencer,
+                                    path_pattern="/Børn og Unge Grundforløb/professionalReference",
+                                    active_pathways_only=True,
+                                )
+                                
+                                if len(sagsbehandler) == 0:
+                                    break
+
+                            # Resolve sagsbehandler, objekt i pathway har ingen kontakt information, dvs. vi resolver hele medarbejderen.
+                            sagsbehandler = self.hent_fra_reference(sagsbehandler[0])
+                            sagsbehandler = self.database.hent_medarbejder_med_activity_id(sagsbehandler.get("activityIdentifier", {}).get("activityId", ""))
+                            sagsbehandler = self.organisationer.hent_medarbejder_ved_initialer(sagsbehandler[0].get("primary_identifier", ""))
+
+                            if sagsbehandler is None:
                                 break
 
-                        # Resolve sagsbehandler, objekt i pathway har ingen kontakt information, dvs. vi resolver hele medarbejderen.
-                        sagsbehandler = self.hent_fra_reference(sagsbehandler[0])
-                        sagsbehandler = self.database.hent_medarbejder_med_activity_id(sagsbehandler.get("activityIdentifier", {}).get("activityId", ""))
-                        sagsbehandler = self.organisationer.hent_medarbejder_ved_initialer(sagsbehandler[0].get("primary_identifier", ""))
-
-                        if sagsbehandler is None:
-                            break
-
-                        sagsbehandler_information = { 
-                            "nexus": {
-                                "initialer": sagsbehandler['initials'],
-                                "navn": sagsbehandler.get("fullName", ""),
-                                "email": f"{sagsbehandler['initials']}@odense.dk",
-                                "telefon": f"{sagsbehandler.get('mobile', '')}"
-                            },
-                            "dubu": {
+                            sagsbehandler_information = { 
+                                "nexus": {
+                                    "initialer": sagsbehandler['initials'],
+                                    "navn": sagsbehandler.get("fullName", ""),
+                                    "email": f"{sagsbehandler['initials']}@odense.dk",
+                                    "telefon": f"{sagsbehandler.get('mobile', '')}"
+                                },
+                                "dubu": {
+                                }
                             }
-                        }
 
-                        barn_model = BarnSynkronisering(
-                            barn_cpr=barn["cpr"],
-                            barn_foraelder_cpr="",
-                            barn_sidst_set=datetime.now(),                            
-                            barn_sagsbehandler_information = sagsbehandler_information,                            
-                        )
-                        
-                        nexus_borgere.append(barn_model)
+                            barn_model = BarnSynkronisering(
+                                barn_cpr=barn["cpr"],
+                                barn_foraelder_cpr="",
+                                barn_sidst_set=datetime.now(),                            
+                                barn_sagsbehandler_information = sagsbehandler_information,                            
+                            )
+                            
+                            nexus_borgere.append(barn_model)
+            except Exception:
+                continue            
 
         return nexus_borgere
 

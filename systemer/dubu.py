@@ -1,7 +1,5 @@
-import json
 from datetime import datetime
 from typing import Optional
-
 from kmd_nexus_client import utils
 from dubu_client import DubuClientManager
 from sbf_database import BarnSynkronisering

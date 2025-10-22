@@ -739,7 +739,7 @@ wheels = [
 [[package]]
 name = "sbf-database"
 version = "0.1.0"
-source = { git = "https://github.com/odense-rpa/sbf-database.git?rev=main#e1964f7fbfb150458a26998f4568f7bac0462847" }
+source = { git = "https://github.com/odense-rpa/sbf-database.git?rev=main#e09875d3e98d72bfb2aa84a1c4c75a8baf58571f" }
 dependencies = [
     { name = "psycopg2-binary" },
     { name = "sqlalchemy" },
