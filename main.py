@@ -27,11 +27,13 @@ async def synkroniser_sbf():
 
     sbf_kandidater = momentum.filtrer_sbf_kandidater(borgere)
     sbf_database.synkroniser_borgere_i_database(sbf_kandidater)
-    
-    # TODO: Populate queues
-    
+
     # TODO: Kontroller for rows til sletning
     #sbf_db.kontroller_sbf_til_inaktivering()
+
+    # TODO: Sletning af rows som har overskredet udløbsdato + status.Slettet
+
+    # TODO: Populate queues
 
     
 if __name__ == "__main__":

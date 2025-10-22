@@ -25,8 +25,7 @@ class Momentum(MomentumClientManager):
                         forældre_cpr = forældre_myndighed.get("Foraelderoplysning", {}).get("Foraelder", {}).get("foraelderPersonnummer", "")
                         if not utils.is_valid_cpr(forældre_cpr):
                             continue
-                        # TODO: Hent sagsbehandler information fra momentum og set data
-
+                        
                         borger = self.borgere.hent_borger(forældre_myndighed.get("Foraelderoplysning", {}).get("Foraelder", {}).get("foraelderPersonnummer", ""))
 
                         if borger is None:
@@ -52,7 +51,7 @@ class Momentum(MomentumClientManager):
                                 .split("@")[0],
                                 "navn": ansvarlig_sagsbehandler.get("displayName", ""),
                                 "email": ansvarlig_sagsbehandler.get("email", ""),
-                                "telefon": ansvarlig_sagsbehandler.get("phone", {}) #Overvej om phone/mobile er inkonsistent
+                                "telefon": ansvarlig_sagsbehandler.get("phone", {})
                             }                    
                         }
 

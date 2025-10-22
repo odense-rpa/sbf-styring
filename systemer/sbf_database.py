@@ -15,9 +15,7 @@ class SBFManager(SBFDatabaseManager):
             )
             if eksisterende_barn is None:
                 eksisterende_barn = self.gem(barn)            
-            
-            eksisterende_barn.barn_cpr = barn.barn_cpr
-            eksisterende_barn.barn_foraelder_cpr = barn.barn_foraelder_cpr
+
             eksisterende_barn.barn_sidst_set = barn.barn_sidst_set        
             eksisterende_barn.barn_sagsbehandler_information = barn.barn_sagsbehandler_information        
 
