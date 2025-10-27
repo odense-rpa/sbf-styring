@@ -21,23 +21,25 @@ async def synkroniser_sbf():
     momentum = get_momentum()
     sbf_database = get_sbf_database()
     
+    # Synkroniser sbf
     dubu_borgere = dubu.hent_dubu_borgere()
     nexus_borgere = nexus.hent_nexus_borgere()
     borgere = sorted(dubu_borgere + nexus_borgere, key=lambda x: x.barn_cpr)
-
     sbf_kandidater = momentum.filtrer_sbf_kandidater(borgere)
     sbf_database.synkroniser_borgere_i_database(sbf_kandidater)
 
-    # TODO: Kontroller for rows til sletning
-    #sbf_db.kontroller_sbf_til_inaktivering()
+    # Sæt status til SKAL_SLETTES for rækker hvor barn- eller foraelder_sidst_set er ældre end 14 dage
+    sbf_database.kontroller_sbf_til_inaktivering()    
 
-    # TODO: Sæt status på rows der er slettet i alle tre systemer, til Status.SLETTET
+    # Sæt status på rows der er slettet i alle tre systemer, til Status.SLETTET
+    sbf_database.opdater_slettet_status()
 
-    # TODO: Sletning af rows som har overskredet udløbsdato + status.Slettet
-
-    # TODO: Populate queues
-
+    # Slet rækker som har haft status slettet i 60 dage.
+    sbf_database.fjern_forældede(60)
     
+    # Hent alle rækker med status SYNC eller SKAL_SLETTES og opret workitem i SBF-fagsystemers work queues
+    sbf_database.opret_kø_items()
+
 if __name__ == "__main__":
     logging.basicConfig(
         level=logging.INFO        
