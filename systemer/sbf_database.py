@@ -89,7 +89,13 @@ class SBFManager(SBFDatabaseManager):
                 "status": status.value,
                 "børn": [{
                     "barn_cpr": x.barn_cpr,
-                    "sagsbehandlere": [y for y in x.barn_sagsbehandler_information.values() if y]
+                    "sagsbehandlere": [
+                        {
+                            **y,
+                            "system": key
+                        }
+                        for key, y in x.barn_sagsbehandler_information.items() if y
+                    ]
                 } for x in børn]
             }
 
