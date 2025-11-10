@@ -183,7 +183,7 @@ if __name__ == "__main__":
     )
 
     # Default database url - anvendes til dev.
-    db_url = "pgsql://postgres:postgres@localhost:5432/sbf"
+    db_url = "postgresql://postgres:postgres@localhost:5432/sbf"
     if "db" in sys.argv:
         db_url = sys.argv[sys.argv.index("db") + 1]
 
