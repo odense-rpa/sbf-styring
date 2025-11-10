@@ -24,3 +24,8 @@ dubu-client = { git = "https://github.com/odense-rpa/dubu-client.git", rev = "ma
 datafordeler = { git = "https://github.com/odense-rpa/datafordeler.git", rev = "main" }
 sbf-database = { git = "https://github.com/odense-rpa/sbf-database.git", rev = "main" }
 momentum-client = { git = "https://github.com/odense-rpa/momentum-client.git", rev = "main" }
+
+[dependency-groups]
+dev = [
+    "ruff>=0.14.4",
+]

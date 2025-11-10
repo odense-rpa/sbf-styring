@@ -1,10 +1,8 @@
 import asyncio
 import logging
 import os
-
-from automation_server_client import AutomationServer, Credential
-from odk_tools.tracking import Tracker
-from odk_tools.reporting import Reporter
+import sys
+from automation_server_client import AutomationServer, Credential, Workqueue
 from systemer import (
     init_dubu,
     get_dubu,
@@ -13,25 +11,15 @@ from systemer import (
     init_momentum,
     get_momentum,
     init_datafordeler,
-    # , init_sbf_database, get_sbf_database
 )
 
-from sbf_database import get_sbf_repository
-
-reporter: Reporter
-tracker: Tracker
-proces_navn = "SBF Styring"
+from sbf_database import get_sbf_repository, SBFRepository
 
 
-async def synkroniser_sbf():
+async def synkroniser_sbf(repository: SBFRepository):
     dubu = get_dubu()
     nexus = get_nexus()
     momentum = get_momentum()
-    # sbf_database = get_sbf_database()
-
-    repository = get_sbf_repository(
-        os.getenv("DB_CONNECTION", "pgsql://postgres:postgres@localhost:5432/sbf"), True
-    )
 
     # Hent børn fra systemer
 
@@ -46,7 +34,7 @@ async def synkroniser_sbf():
     # Nustil børn
     børn = repository.hent_alle_børn()
     for barn in børn:
-        repository.opdater_barn(barn.cpr, {"aktiv": False})
+        repository.opdater_barn(barn.cpr, {"aktiv": False, "sagsbehandler": []})
 
     # Set aktive børn
     børn = dubu_børn + nexus_børn
@@ -87,19 +75,23 @@ async def synkroniser_sbf():
     # Nulstil alle forældre
     alle_voksne = repository.hent_alle_forældre()
     for voksen in alle_voksne:
-        repository.opdater_foraelder(voksen.cpr, {"aktiv": False})
+        repository.opdater_foraelder(
+            voksen.cpr, {"aktiv": False, "sagsbehandler": None}
+        )
 
     # Tilknyt og opret aktive forældre.
     for voksen in voksne:
         db_voksen = repository.hent_foraelder(voksen["cpr"])
         if db_voksen is None:
-            db_voksen = repository.opret_foraelder({
-                "cpr": voksen["cpr"],
-                "navn": voksen["navn"],
-                "aktiv": True,
-                "sidst_set": voksen["sidst_set"],
-                "sagsbehandler": voksen["sagsbehandler"],
-            })
+            db_voksen = repository.opret_foraelder(
+                {
+                    "cpr": voksen["cpr"],
+                    "navn": voksen["navn"],
+                    "aktiv": True,
+                    "sidst_set": voksen["sidst_set"],
+                    "sagsbehandler": voksen["sagsbehandler"],
+                }
+            )
         else:
             repository.opdater_foraelder(
                 voksen["cpr"],
@@ -117,39 +109,85 @@ async def synkroniser_sbf():
     logging.info(f"Slettet {slettet} inaktive SBF sæt")
 
 
+async def opret_workqueues(repository: SBFRepository):
+    børn = repository.hent_alle_børn()
+    børnekøer: list[Workqueue] = [Workqueue.get_workqueue(id) for id in [19, 20]]
+
+    for barn in børn:
+        item = {
+            "cpr": barn.cpr,
+            "navn": barn.navn,
+            "sidst_set": barn.sidst_set.isoformat() if barn.sidst_set else None,
+            "sagsbehandler": barn.sagsbehandler,
+            "aktiv": barn.aktiv,
+            "forældre": [
+                {
+                    "cpr": forælder.cpr,
+                    "navn": forælder.navn,
+                    "aktiv": forælder.aktiv,
+                    "sidst_set": forælder.sidst_set.isoformat()
+                    if forælder.sidst_set
+                    else None,
+                    "sagsbehandler": forælder.sagsbehandler,
+                }
+                for forælder in barn.foraeldre
+            ],
+        }
+
+        for børnekø in børnekøer:
+            børnekø.add_item(item, barn.cpr)
+
+    forældre = repository.hent_alle_forældre()
+    forældrekø: Workqueue = Workqueue.get_workqueue(21)
+
+    for forælder in forældre:
+        item = {
+            "cpr": forælder.cpr,
+            "navn": forælder.navn,
+            "sidst_set": forælder.sidst_set.isoformat() if forælder.sidst_set else None,
+            "sagsbehandler": forælder.sagsbehandler,
+            "aktiv": forælder.aktiv,
+            "børn": [
+                {
+                    "cpr": barn.cpr,
+                    "navn": barn.navn,
+                    "aktiv": barn.aktiv,
+                    "sidst_set": barn.sidst_set.isoformat() if barn.sidst_set else None,
+                    "sagsbehandler": barn.sagsbehandler,
+                }
+                for barn in forælder.boern
+            ],
+        }
+        forældrekø.add_item(item, forælder.cpr)
+
+
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
 
     ats = AutomationServer.from_environment()
-    workqueue = ats.workqueue()
 
     nexus_credential = Credential.get_credential("KMD Nexus - produktion")
     nexus_database_credential = Credential.get_credential("KMD Nexus - database")
     momentum_credential = Credential.get_credential("Momentum - produktion")
     user_credential = Credential.get_credential("RoboA")
-    tracking_credential = Credential.get_credential("Odense SQL Server")
-
-    certifikat_sti = os.getenv("CERTIFIKATER", "/certifikater")
 
     init_dubu(user_credential)
     init_nexus(nexus_credential, nexus_database_credential)
     init_momentum(momentum_credential)
+
+    # Overskriv stien i forbindelse med udvikling
+    certifikat_sti = os.getenv("CERTIFIKATER", "/certifikater")
     init_datafordeler(
         certifikat_sti=os.path.join(certifikat_sti, "datafordeler.crt"),
         certifikat_nøglefil=os.path.join(certifikat_sti, "datafordeler.key"),
     )
-    # init_sbf_database(
-    #    database_url=os.getenv("DB_CONNECTION", "pgsql://postgres:postgres@localhost:5432/sbf")
-    # )
 
-    reporter = Reporter(
-        username=user_credential.username, password=user_credential.password
-    )
-    tracker = Tracker(
-        username=tracking_credential.username, password=tracking_credential.password
-    )
+    db_url = "pgsql://postgres:postgres@localhost:5432/sbf"
+    if "db" in sys.argv:
+        db_url = sys.argv[sys.argv.index("db") + 1]
 
-    logger = logging.getLogger(__name__)
+    repository = get_sbf_repository(db_url, True)
 
     # Process workqueue
-    asyncio.run(synkroniser_sbf())
+    asyncio.run(synkroniser_sbf(repository))
+    asyncio.run(opret_workqueues(repository))

@@ -1,5 +1,3 @@
-import copy
-
 from datetime import datetime
 from httpx import HTTPStatusError
 from kmd_nexus_client import utils
@@ -79,7 +77,7 @@ class Momentum(MomentumClientManager):
                             "aktiv": True,
                             "sidst_set": datetime.now(),
                             "sagsbehandler": sagsbehandler_information,
-                            "barn": barn.cpr
+                            "barn": barn.cpr,
                         }
 
                         sbf_kandidater.append(forælder)

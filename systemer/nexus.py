@@ -88,9 +88,7 @@ class Nexus(NexusClientManager):
                         "cpr": barn["cpr"],
                         "navn": nexus_borger["fullName"],
                         "aktiv": True,
-                        "sidst_set": datetime.now(
-                            ZoneInfo("Europe/Copenhagen")
-                        ),
+                        "sidst_set": datetime.now(ZoneInfo("Europe/Copenhagen")),
                         "sagsbehandler": [sagsbehandler],
                     }
                 )
@@ -99,7 +97,9 @@ class Nexus(NexusClientManager):
 
         return nexus_borgere
 
-    def _find_sagsbehandler(self,indsats_referencer: List[dict[str,Any]], forløb) -> dict | None:
+    def _find_sagsbehandler(
+        self, indsats_referencer: List[dict[str, Any]], forløb
+    ) -> dict | None:
         """Finder sagsbehandler for en given borger baseret på indsats referencer"""
         # Check forløb med aktiv indsats for sagsbehandler
         sagsbehandler = filter_by_path(
@@ -121,17 +121,11 @@ class Nexus(NexusClientManager):
 
         # Resolve sagsbehandler, objekt i pathway har ingen kontakt information, dvs. vi resolver hele medarbejderen.
         sagsbehandler = self.hent_fra_reference(sagsbehandler[0])
-        sagsbehandler = (
-            self.database.hent_medarbejder_med_activity_id(
-                sagsbehandler.get("activityIdentifier", {}).get(
-                    "activityId", ""
-                )
-            )
+        sagsbehandler = self.database.hent_medarbejder_med_activity_id(
+            sagsbehandler.get("activityIdentifier", {}).get("activityId", "")
         )
-        sagsbehandler = (
-            self.organisationer.hent_medarbejder_ved_initialer(
-                sagsbehandler[0].get("primary_identifier", "")
-            )
+        sagsbehandler = self.organisationer.hent_medarbejder_ved_initialer(
+            sagsbehandler[0].get("primary_identifier", "")
         )
 
         if sagsbehandler is None:
@@ -143,8 +137,10 @@ class Nexus(NexusClientManager):
             "email": f"{sagsbehandler['initials']}@odense.dk",
             "telefon": f"{sagsbehandler.get('mobile', '')}",
         }
-    
-    def _er_i_sbf_kandidat_forløb(self, indsats_referencer: List[dict[str,Any]], borger: dict) -> str | None:
+
+    def _er_i_sbf_kandidat_forløb(
+        self, indsats_referencer: List[dict[str, Any]], borger: dict
+    ) -> str | None:
         """Tjekker om borger er kandidat til SBF baseret på referencer og borger data"""
         for forløb in nexus_forløb:
             filtrerede_indsats_referencer = filter_by_path(

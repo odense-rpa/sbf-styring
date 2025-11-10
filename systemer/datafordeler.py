@@ -6,10 +6,9 @@ from httpx import ReadTimeout
 class Datafordeler:
     def __init__(self, certifikat_sti: str, certifikat_nøglefil: str):
         self.client = DatafordelerClient(
-            certifikat_sti=certifikat_sti,
-            certifikat_nøglefil=certifikat_nøglefil
+            certifikat_sti=certifikat_sti, certifikat_nøglefil=certifikat_nøglefil
         )
-    
+
     def hent_forældre_myndigheder(self, cpr: str) -> list[dict]:
         """Hent forældremyndighedsoplysninger for et givet CPR-nummer"""
         try:

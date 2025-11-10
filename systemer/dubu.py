@@ -15,7 +15,7 @@ class Dubu(DubuClientManager):
         dubu_borgere_ufiltreret = self.sager.soeg_sager_sammenhaengende_borger_forloeb()
 
         for person in dubu_borgere_ufiltreret["value"]:
-            cpr = person.get("primaerPerson", {}).get("cprnr",None)
+            cpr = person.get("primaerPerson", {}).get("cprnr", None)
             if cpr is None:
                 continue
 
@@ -53,7 +53,6 @@ class Dubu(DubuClientManager):
                     "sagsbehandler": [sagsbehandler_information],
                 }
             )
-
 
         return dubu_borgere
 
