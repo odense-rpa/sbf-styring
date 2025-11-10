@@ -182,6 +182,7 @@ if __name__ == "__main__":
         certifikat_nøglefil=os.path.join(certifikat_sti, "datafordeler.key"),
     )
 
+    # Default database url - anvendes til dev.
     db_url = "pgsql://postgres:postgres@localhost:5432/sbf"
     if "db" in sys.argv:
         db_url = sys.argv[sys.argv.index("db") + 1]
