@@ -184,8 +184,8 @@ if __name__ == "__main__":
 
     # Default database url - anvendes til dev.
     db_url = "postgresql://postgres:postgres@localhost:5432/sbf"
-    if "db" in sys.argv:
-        db_url = sys.argv[sys.argv.index("db") + 1]
+    if "--database" in sys.argv:
+        db_url = sys.argv[sys.argv.index("--database") + 1]
 
     repository = get_sbf_repository(db_url, True)
 
