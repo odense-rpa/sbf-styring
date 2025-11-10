@@ -2,6 +2,7 @@ import asyncio
 import logging
 import os
 import sys
+from sbf_database import get_sbf_repository, SBFRepository
 from automation_server_client import AutomationServer, Credential, Workqueue
 from systemer import (
     init_dubu,
@@ -13,7 +14,6 @@ from systemer import (
     init_datafordeler,
 )
 
-from sbf_database import get_sbf_repository, SBFRepository
 
 
 async def synkroniser_sbf(repository: SBFRepository):
