@@ -42,6 +42,7 @@ class Dubu(DubuClientManager):
                 "navn": sagsbehandler.get("fuldeNavn", ""),
                 "email": sagsbehandler.get("adresse", {}).get("emailAdresse", ""),
                 "telefon": sagsbehandler.get("adresse", {}).get("mobiltelefon", ""),
+                "system": "Dubu",
             }
 
             dubu_borgere.append(

@@ -136,6 +136,7 @@ class Nexus(NexusClientManager):
             "navn": sagsbehandler.get("fullName", ""),
             "email": f"{sagsbehandler['initials']}@odense.dk",
             "telefon": f"{sagsbehandler.get('mobile', '')}",
+            "system": "Nexus",
         }
 
     def _er_i_sbf_kandidat_forløb(
