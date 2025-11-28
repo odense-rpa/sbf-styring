@@ -445,7 +445,7 @@ wheels = [
 [[package]]
 name = "nexus-database-client"
 version = "0.1.0"
-source = { git = "https://github.com/odense-rpa/nexus-database-client.git?rev=main#2eed9724ef83b9eac562bc19b8a03c93c2b7461b" }
+source = { git = "https://github.com/odense-rpa/nexus-database-client.git?rev=main#4bb22828c0fce1c066f3f1360b8f4755d186fddc" }
 dependencies = [
     { name = "dotenv" },
     { name = "mysql-connector-python" },
