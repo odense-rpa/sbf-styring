@@ -16,10 +16,7 @@ nexus_forløb = [
     "Sag: Støtte til børn og unge med funktionsnedsættelse",
     "Sag: Underretning",
     "Sag: Ungestøtte og overgangen til voksenlivet",
-    "Sag: Æresrelaterede konflikter",
-    "Udfører - Familiebehandling og vejledning",
-    "Udfører - Støtte- og kontaktperson",
-    "Udfører - Æresrelaterede konflikter",
+    "Sag: Æresrelaterede konflikter"   
 ]
 
 
