@@ -242,7 +242,7 @@ wheels = [
 [[package]]
 name = "dubu-client"
 version = "0.1.0"
-source = { git = "https://github.com/odense-rpa/dubu-client.git?rev=main#aa2fcbd942ab09a82bfb5a4b788fb80bedbc5b46" }
+source = { git = "https://github.com/odense-rpa/dubu-client.git?rev=main#b24b9d22e937778ade61992eb132e0a19306f5d2" }
 dependencies = [
     { name = "authlib" },
     { name = "httpx" },
