@@ -25,7 +25,7 @@ class Momentum(MomentumClientManager):
                 for forældre_myndighed in forældre_myndigheder:
                     forældre_cpr = (
                         forældre_myndighed.get("Foraeldermyndighedsoplysning", {})
-                        .get("Foraeldermyndighed", {})
+                        .get("Foraeldermyndig", {})
                         .get("foraeldermyndighedPersonnummer", "")
                     )
                     if self._kontroller_forælder_i_momentum(forældre_cpr):
