@@ -23,20 +23,16 @@ class Momentum(MomentumClientManager):
                     str(barn.cpr)
                 )
                 for forældre_myndighed in forældre_myndigheder:
-                    if self._kontroller_forælder_i_momentum(forældre_myndighed):
-                        forældre_cpr = (
-                            forældre_myndighed.get("Foraelderoplysning", {})
-                            .get("Foraelder", {})
-                            .get("foraelderPersonnummer", "")
-                        )
+                    forældre_cpr = (
+                        forældre_myndighed.get("Foraeldermyndighedsoplysning", {})
+                        .get("Foraeldermyndighed", {})
+                        .get("foraeldermyndighedPersonnummer", "")
+                    )
+                    if self._kontroller_forælder_i_momentum(forældre_cpr):
                         if not utils.is_valid_cpr(forældre_cpr):
                             continue
 
-                        borger = self.borgere.hent_borger(
-                            forældre_myndighed.get("Foraelderoplysning", {})
-                            .get("Foraelder", {})
-                            .get("foraelderPersonnummer", "")
-                        )
+                        borger = self.borgere.hent_borger(forældre_cpr)
 
                         if borger is None:
                             continue
@@ -86,13 +82,9 @@ class Momentum(MomentumClientManager):
 
         return sbf_kandidater
 
-    def _kontroller_forælder_i_momentum(self, forælder_myndighed: dict) -> bool:
+    def _kontroller_forælder_i_momentum(self, forældre_cpr: str) -> bool:
         try:
-            forælder = self.borgere.hent_borger(
-                forælder_myndighed.get("Foraelderoplysning", {})
-                .get("Foraelder", {})
-                .get("foraelderPersonnummer", "")
-            )
+            forælder = self.borgere.hent_borger(forældre_cpr)
         except HTTPStatusError:
             return False
 

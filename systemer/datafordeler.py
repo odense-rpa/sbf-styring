@@ -17,7 +17,7 @@ class Datafordeler:
             if isinstance(e, ReadTimeout):
                 return []
             raise
-        return person_data.get("Person", {}).get("Foraelderoplysninger", [])
+        return person_data.get("Person", {}).get("Foraeldermyndighedsoplysninger", [])
 
 
 # Global instance

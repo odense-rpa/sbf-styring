@@ -163,6 +163,13 @@ async def opret_workqueues(repository: SBFRepository):
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
 
+    db_url = "postgresql://postgres:postgres@localhost:5432/sbf"
+    if "--database" in sys.argv:
+        db_url = sys.argv[sys.argv.index("--database") + 1]
+
+    repository = get_sbf_repository(db_url, True)
+    børn = repository.hent_alle_børn()
+
     ats = AutomationServer.from_environment()
 
     nexus_credential = Credential.get_credential("KMD Nexus - produktion")
