@@ -15,45 +15,48 @@ class Dubu(DubuClientManager):
         dubu_borgere_ufiltreret = self.sager.soeg_sager_sammenhaengende_borger_forloeb()
 
         for person in dubu_borgere_ufiltreret["value"]:
-            cpr = person.get("primaerPerson", {}).get("cprnr", None)
-            if cpr is None:
-                continue
+            try:
+                cpr = person.get("primaerPerson", {}).get("cprnr", None)
+                if cpr is None:
+                    continue
 
-            if len([x for x in dubu_borgere if x["cpr"] == cpr]) > 0:
-                continue
+                if len([x for x in dubu_borgere if x["cpr"] == cpr]) > 0:
+                    continue
 
-            sagsbehandler = self.brugere.hent_org_bruger(
-                person.get("primaerBehandler", {}).get("orgBrugerId", -1)
-            )
+                sagsbehandler = self.brugere.hent_org_bruger(
+                    person.get("primaerBehandler", {}).get("orgBrugerId", -1)
+                )
 
-            if sagsbehandler is None:
-                continue
+                if sagsbehandler is None:
+                    continue
 
-            if not utils.is_valid_cpr(cpr):
-                continue
+                if not utils.is_valid_cpr(cpr):
+                    continue
 
-            if len([x for x in dubu_borgere if x["cpr"] == cpr]) > 0:
-                continue
+                if len([x for x in dubu_borgere if x["cpr"] == cpr]) > 0:
+                    continue
 
-            sagsbehandler_information = {
-                "initialer": sagsbehandler.get("adresse", {})
-                .get("emailAdresse", "")
-                .split("@")[0],
-                "navn": sagsbehandler.get("fuldeNavn", ""),
-                "email": sagsbehandler.get("adresse", {}).get("emailAdresse", ""),
-                "telefon": sagsbehandler.get("adresse", {}).get("mobiltelefon", ""),
-                "system": "Dubu",
-            }
-
-            dubu_borgere.append(
-                {
-                    "cpr": cpr,
-                    "navn": person["primaerPerson"]["fuldeNavn"],
-                    "aktiv": True,
-                    "sidst_set": datetime.now(ZoneInfo("Europe/Copenhagen")),
-                    "sagsbehandler": [sagsbehandler_information],
+                sagsbehandler_information = {
+                    "initialer": sagsbehandler.get("adresse", {})
+                    .get("emailAdresse", "")
+                    .split("@")[0],
+                    "navn": sagsbehandler.get("fuldeNavn", ""),
+                    "email": sagsbehandler.get("adresse", {}).get("emailAdresse", ""),
+                    "telefon": sagsbehandler.get("adresse", {}).get("mobiltelefon", ""),
+                    "system": "Dubu",
                 }
-            )
+
+                dubu_borgere.append(
+                    {
+                        "cpr": cpr,
+                        "navn": person["primaerPerson"]["fuldeNavn"],
+                        "aktiv": True,
+                        "sidst_set": datetime.now(ZoneInfo("Europe/Copenhagen")),
+                        "sagsbehandler": [sagsbehandler_information],
+                    }
+                )
+            except Exception:
+                continue
 
         return dubu_borgere
 
