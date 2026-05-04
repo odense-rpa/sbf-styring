@@ -1,6 +1,8 @@
+import logging
 from zoneinfo import ZoneInfo
 from datetime import datetime
 from typing import Optional
+import httpx
 from kmd_nexus_client import utils
 from dubu_client import DubuClientManager
 from automation_server_client import Credential
@@ -9,10 +11,26 @@ from automation_server_client import Credential
 class Dubu(DubuClientManager):
     def __init__(self, brugernavn, adgangskode: str, idp: str):
         super().__init__(brugernavn, adgangskode, idp)
+        # Dubu endpoint(s) may return 301 redirects. Ensure HTTP client follows them.
+        self._client._client.follow_redirects = True
 
     def hent_dubu_borgere(self) -> list[dict]:
         dubu_borgere: list[dict] = []
-        dubu_borgere_ufiltreret = self.sager.soeg_sager_sammenhaengende_borger_forloeb()
+        try:
+            dubu_borgere_ufiltreret = (
+                self.sager.soeg_sager_sammenhaengende_borger_forloeb()
+            )
+        except httpx.HTTPStatusError as exc:
+            status = exc.response.status_code
+            location = exc.response.headers.get("location", "")
+            logging.error(
+                "Dubu API-fejl ved hentning af sammenhaengende borgerforloeb "
+                "(status=%s, location=%s, url=%s)",
+                status,
+                location,
+                str(exc.request.url),
+            )
+            raise
 
         for person in dubu_borgere_ufiltreret["value"]:
             try:
