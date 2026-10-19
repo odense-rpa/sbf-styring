@@ -22,12 +22,7 @@ class Momentum(MomentumClientManager):
                 forældre_myndigheder = datafordeler.hent_forældre_myndigheder(
                     str(barn.cpr)
                 )
-                for forældre_myndighed in forældre_myndigheder:
-                    forældre_cpr = (
-                        forældre_myndighed.get("Foraeldermyndighedsoplysning", {})
-                        .get("Foraeldermyndig", {})
-                        .get("foraeldermyndighedPersonnummer", "")
-                    )
+                for forældre_cpr in forældre_myndigheder:
                     if self._kontroller_forælder_i_momentum(forældre_cpr):
                         if not utils.is_valid_cpr(forældre_cpr):
                             continue

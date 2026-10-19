@@ -1,7 +1,5 @@
 .venv
 .env
-certifikater/*.crt
-certifikater/*.key
 __pycache__
 *.pyc
 *.pyo

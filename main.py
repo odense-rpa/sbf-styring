@@ -1,6 +1,5 @@
 import asyncio
 import logging
-import os
 import sys
 from sbf_database import get_sbf_repository, SBFRepository
 from automation_server_client import AutomationServer, Credential, Workqueue
@@ -176,16 +175,15 @@ if __name__ == "__main__":
     nexus_database_credential = Credential.get_credential("KMD Nexus - database")
     momentum_credential = Credential.get_credential("Momentum - produktion")
     user_credential = Credential.get_credential("RoboA")
+    datafordeler_credential = Credential.get_credential("Datafordeler")
 
     init_dubu(user_credential)
     init_nexus(nexus_credential, nexus_database_credential)
     init_momentum(momentum_credential)
 
-    # Overskriv stien i forbindelse med udvikling
-    certifikat_sti = os.getenv("CERTIFIKATER", "/certifikater")
     init_datafordeler(
-        certifikat_sti=os.path.join(certifikat_sti, "datafordeler.crt"),
-        certifikat_nøglefil=os.path.join(certifikat_sti, "datafordeler.key"),
+        client_id=datafordeler_credential.username,
+        client_secret=datafordeler_credential.password,
     )
 
     # Default database url - anvendes til dev.
