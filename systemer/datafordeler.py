@@ -1,33 +1,33 @@
 from typing import Optional
-from datafordeler import Datafordeler as DatafordelerClient
+from datafordeler import DatafordelerGraphQL
 from httpx import ReadTimeout
 
 
 class Datafordeler:
-    def __init__(self, certifikat_sti: str, certifikat_nøglefil: str):
-        self.client = DatafordelerClient(
-            certifikat_sti=certifikat_sti, certifikat_nøglefil=certifikat_nøglefil
+    def __init__(self, client_id: str, client_secret: str):
+        self.client = DatafordelerGraphQL(
+            client_id=client_id, client_secret=client_secret
         )
 
-    def hent_forældre_myndigheder(self, cpr: str) -> list[dict]:
-        """Hent forældremyndighedsoplysninger for et givet CPR-nummer"""
+    def hent_forældre_myndigheder(self, cpr: str) -> list[str]:
+        """Hent CPR-numre på aktuelle forældremyndighedsindehavere for et givet CPR-nummer"""
         try:
-            person_data = self.client.hent_personoplysninger(cpr)
+            person = self.client.hent_person(cpr)
         except Exception as e:
             if isinstance(e, ReadTimeout):
                 return []
             raise
-        return person_data.get("Person", {}).get("Foraeldermyndighedsoplysninger", [])
+        return list(person.foraeldremyndighed)
 
 
 # Global instance
 datafordeler: Optional[Datafordeler] = None
 
 
-def init_datafordeler(certifikat_sti: str, certifikat_nøglefil: str) -> None:
+def init_datafordeler(client_id: str, client_secret: str) -> None:
     """Initialize the global datafordeler instance"""
     global datafordeler
-    datafordeler = Datafordeler(certifikat_sti, certifikat_nøglefil)
+    datafordeler = Datafordeler(client_id, client_secret)
 
 
 def get_datafordeler() -> Datafordeler:
